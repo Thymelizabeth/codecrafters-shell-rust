@@ -15,5 +15,5 @@ fn main() -> Result<(), io::Error> {
 fn prompt() -> Result<(), io::Error> {
     let mut stdout = io::stdout();
     write!(&mut stdout, "$ ")?;
-    stdout.flush();
+    stdout.flush()
 }
