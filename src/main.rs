@@ -16,7 +16,7 @@ fn main() -> Result<(), io::Error> {
         prompt()?;
 
         io::stdin().read_line(&mut input)?;
-        match Command::parse_command(&input) {
+        match Command::from(input.as_str()) {
             Command::Builtin(Builtin::Exit) => break,
             Command::Builtin(cmd) => cmd.eval()?,
             Command::Unknown(cmd) => writeln!(io::stdout(), "{}: command not found", cmd.trim())?,
@@ -32,8 +32,8 @@ fn prompt() -> Result<(), io::Error> {
     stdout.flush()
 }
 
-impl<'a> Command<'a> {
-    fn parse_command(input: &'a str) -> Self {
+impl<'a> From<&'a str> for Command<'a> {
+    fn from(input: &'a str) -> Self {
         let mut split_input = input.splitn(2, " ");
         match split_input.next().map(str::trim) {
             Some("exit") => Command::Builtin(Builtin::Exit),
