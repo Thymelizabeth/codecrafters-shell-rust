@@ -8,6 +8,7 @@ enum Command<'a> {
 enum Builtin<'a> {
     Echo(&'a str),
     Exit,
+    Type(&'a str),
 }
 
 fn main() -> Result<(), io::Error> {
@@ -38,6 +39,7 @@ impl<'a> From<&'a str> for Command<'a> {
         match split_input.next().map(str::trim) {
             Some("exit") => Command::Builtin(Builtin::Exit),
             Some("echo") => Command::Builtin(Builtin::Echo(split_input.next().unwrap_or(""))),
+            Some("type") => Command::Builtin(Builtin::Type(split_input.next().unwrap_or(""))),
             _ => Command::Unknown(input),
         }
     }
@@ -48,6 +50,10 @@ impl<'a> Builtin<'a> {
         Ok(match self {
             Builtin::Exit => {}
             Builtin::Echo(args) => writeln!(io::stdout(), "{}", args.trim())?,
+            Builtin::Type(arg) => match Command::from(arg) {
+                Command::Builtin(_) => writeln!(io::stdout(), "{} is a shell builtin", arg.trim())?,
+                Command::Unknown(_) => writeln!(io::stdout(), "{}: not found", arg.trim())?,
+            },
         })
     }
 }
