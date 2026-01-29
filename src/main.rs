@@ -89,7 +89,14 @@ impl<'a> Builtin<'a> {
         match self {
             Builtin::Cd(arg) => {
                 let path = Path::new(arg.trim());
-                env::set_current_dir(path)?
+                match env::set_current_dir(path) {
+                    Ok(()) => (),
+                    Err(_) => writeln!(
+                        io::stdout(),
+                        "cd: {}: No such file or directory",
+                        path.display()
+                    )?,
+                }
             }
             Builtin::Exit => {}
             Builtin::Echo(args) => writeln!(io::stdout(), "{}", args.trim())?,
