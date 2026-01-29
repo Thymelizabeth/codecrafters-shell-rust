@@ -36,10 +36,12 @@ fn prompt() -> Result<(), io::Error> {
 impl<'a> From<&'a str> for Command<'a> {
     fn from(input: &'a str) -> Self {
         let mut split_input = input.splitn(2, " ");
-        match split_input.next().map(str::trim) {
+        let cmd = split_input.next().map(str::trim);
+        let args = split_input.next().unwrap_or("");
+        match cmd {
             Some("exit") => Command::Builtin(Builtin::Exit),
-            Some("echo") => Command::Builtin(Builtin::Echo(split_input.next().unwrap_or(""))),
-            Some("type") => Command::Builtin(Builtin::Type(split_input.next().unwrap_or(""))),
+            Some("echo") => Command::Builtin(Builtin::Echo(args)),
+            Some("type") => Command::Builtin(Builtin::Type(args)),
             _ => Command::Unknown(input),
         }
     }
