@@ -2,7 +2,7 @@ use std::{
     env,
     fs::{self, DirEntry},
     io::{self, Write},
-    os::unix::fs::PermissionsExt,
+    os::unix::{fs::PermissionsExt, process::CommandExt},
     path::Path,
     process,
 };
@@ -29,6 +29,7 @@ fn main() -> Result<(), io::Error> {
             Command::Builtin(cmd) => cmd.eval()?,
             Command::Executable(cmd, args) => {
                 process::Command::new(cmd.path())
+                    .arg0(cmd.file_name())
                     .args(args.trim().split(' ').filter(|arg| !arg.is_empty()))
                     .spawn()?
                     .wait()?;
