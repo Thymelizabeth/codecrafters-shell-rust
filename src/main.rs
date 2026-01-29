@@ -35,13 +35,7 @@ fn main() -> Result<(), io::Error> {
         match Command::from(input.as_str()) {
             Command::Exit => break,
             Command::Builtin(cmd) => cmd.eval()?,
-            Command::Executable(Executable(cmd, args)) => {
-                process::Command::new(cmd.path())
-                    .arg0(cmd.file_name())
-                    .args(args.trim().split(' ').filter(|arg| !arg.is_empty()))
-                    .spawn()?
-                    .wait()?;
-            }
+            Command::Executable(cmd) => cmd.eval()?,
             Command::Unknown(cmd) => writeln!(io::stdout(), "{}: command not found", cmd.trim())?,
         }
         input.clear();
@@ -142,6 +136,7 @@ impl<'a> Eval for Executable<'a> {
             .args(args.trim().split(' ').filter(|arg| !arg.is_empty()))
             .spawn()?
             .wait()?;
+        Ok(())
     }
 }
 
