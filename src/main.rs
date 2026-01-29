@@ -88,7 +88,14 @@ impl<'a> Builtin<'a> {
     fn eval(self) -> Result<(), io::Error> {
         match self {
             Builtin::Cd(arg) => {
-                let path = Path::new(arg.trim());
+                let home;
+                let path = Path::new(match arg.trim() {
+                    "~" => {
+                        home = env::var("HOME").map_err(|_| io::ErrorKind::NotFound)?;
+                        home.as_str()
+                    }
+                    arg => arg,
+                });
                 match env::set_current_dir(path) {
                     Ok(()) => (),
                     Err(_) => writeln!(
