@@ -1,6 +1,6 @@
 use std::io::{self, Write};
 
-fn main() -> Result<(), Box<io::Error>> {
+fn main() -> Result<(), io::Error> {
     print!("$ ");
     io::stdout().flush().unwrap();
     let mut input = String::new();
