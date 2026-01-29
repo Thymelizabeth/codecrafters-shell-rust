@@ -1,10 +1,14 @@
 use std::io::{self, Write};
 
 fn main() -> Result<(), io::Error> {
-    prompt()?;
     let mut input = String::new();
-    io::stdin().read_line(&mut input)?;
-    println!("{}: command not found", input.trim());
+    loop {
+        prompt()?;
+
+        io::stdin().read_line(&mut input)?;
+        println!("{}: command not found", input.trim());
+        input.clear();
+    }
     Ok(())
 }
 
