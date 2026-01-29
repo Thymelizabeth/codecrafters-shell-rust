@@ -34,8 +34,8 @@ fn prompt() -> Result<(), io::Error> {
 
 impl<'a> Command<'a> {
     fn parse_command(input: &'a str) -> Self {
-        let mut split_input = input.trim().splitn(2, " ");
-        match split_input.next() {
+        let mut split_input = input.splitn(2, " ");
+        match split_input.next().map(str::trim) {
             Some("exit") => Command::Builtin(Builtin::Exit),
             Some("echo") => Command::Builtin(Builtin::Echo(split_input.next().unwrap_or(""))),
             _ => Command::Unknown(input),
@@ -47,7 +47,7 @@ impl<'a> Builtin<'a> {
     fn eval(self) -> Result<(), io::Error> {
         Ok(match self {
             Builtin::Exit => {}
-            Builtin::Echo(args) => writeln!(io::stdout(), "{}", args)?,
+            Builtin::Echo(args) => writeln!(io::stdout(), "{}", args.trim())?,
         })
     }
 }
