@@ -1,15 +1,23 @@
 use std::{
     env,
-    fs::{self, DirEntry},
+    fs::{self, DirEntry, File},
     io::{self, Write},
     os::unix::{fs::PermissionsExt, process::CommandExt},
     path::Path,
-    process,
+    process::{self, Stdio},
 };
 
+type OutputRedir<'a> = Option<&'a Path>;
+
 enum Command<'a> {
-    Builtin(Builtin<'a>),
-    Executable(Executable<'a>),
+    Builtin {
+        command: Builtin<'a>,
+        stdout: OutputRedir<'a>,
+    },
+    Executable {
+        command: Executable<'a>,
+        stdout: OutputRedir<'a>,
+    },
     Exit,
     Unknown(&'a str),
 }
@@ -23,8 +31,8 @@ enum Builtin<'a> {
 
 struct Executable<'a>(DirEntry, &'a str);
 
-trait Eval {
-    fn eval(self) -> Result<(), io::Error>;
+trait Eval<'a> {
+    fn eval(self, stdout: OutputRedir<'a>) -> Result<(), io::Error>;
 }
 
 fn main() -> Result<(), io::Error> {
@@ -34,8 +42,8 @@ fn main() -> Result<(), io::Error> {
         io::stdin().read_line(&mut input)?;
         match Command::from(input.as_str()) {
             Command::Exit => break,
-            Command::Builtin(cmd) => cmd.eval()?,
-            Command::Executable(cmd) => cmd.eval()?,
+            Command::Builtin { command, stdout } => command.eval(stdout)?,
+            Command::Executable { command, stdout } => command.eval(stdout)?,
             Command::Unknown(cmd) => writeln!(io::stdout(), "{}: command not found", cmd.trim())?,
         }
         input.clear();
@@ -51,16 +59,36 @@ fn prompt() -> Result<(), io::Error> {
 
 impl<'a> From<&'a str> for Command<'a> {
     fn from(input: &'a str) -> Self {
-        let mut split_input = input.splitn(2, " ");
-        let cmd = split_input.next().map(str::trim);
-        let args = split_input.next().unwrap_or("");
+        let (cmd, args) = match input.split_once(" ") {
+            Some((cmd, args)) => (cmd.trim(), args),
+            None => (input, ""),
+        };
+        let (args, stdout) = match args.split_once("1>") {
+            Some((args, stdout)) => (args, Some(Path::new(stdout))),
+            None => match args.split_once(">") {
+                Some((args, stdout)) => (args, Some(Path::new(stdout))),
+                None => (args, None),
+            },
+        };
         match cmd {
-            Some("exit") => Command::Exit,
-            Some("echo") => Command::Builtin(Builtin::Echo(args)),
-            Some("type") => Command::Builtin(Builtin::Type(args)),
-            Some("pwd") => Command::Builtin(Builtin::Pwd),
-            Some("cd") => Command::Builtin(Builtin::Cd(args)),
-            Some(cmd) => {
+            "exit" => Command::Exit,
+            "echo" => Command::Builtin {
+                command: Builtin::Echo(args),
+                stdout,
+            },
+            "type" => Command::Builtin {
+                command: Builtin::Type(args),
+                stdout,
+            },
+            "pwd" => Command::Builtin {
+                command: Builtin::Pwd,
+                stdout,
+            },
+            "cd" => Command::Builtin {
+                command: Builtin::Cd(args),
+                stdout,
+            },
+            cmd => {
                 let path = env::var_os("PATH").unwrap_or_default();
                 let path = env::split_paths(&path);
                 for dir in path {
@@ -74,12 +102,14 @@ impl<'a> From<&'a str> for Command<'a> {
                         })
                         && is_executable(&cmd.path())
                     {
-                        return Command::Executable(Executable(cmd, args));
+                        return Command::Executable {
+                            command: Executable(cmd, args),
+                            stdout,
+                        };
                     }
                 }
                 Command::Unknown(input)
             }
-            None => Command::Unknown(input),
         }
     }
 }
@@ -88,10 +118,13 @@ impl<'a> Builtin<'a> {
     #[inline]
     fn type_(arg: &str) -> String {
         match Command::from(arg) {
-            Command::Builtin(_) | Command::Exit => {
+            Command::Builtin { .. } | Command::Exit => {
                 format!("{} is a shell builtin", arg.trim())
             }
-            Command::Executable(Executable(cmd, _)) => {
+            Command::Executable {
+                command: Executable(cmd, _),
+                ..
+            } => {
                 format!("{} is {}", cmd.file_name().display(), cmd.path().display())
             }
             Command::Unknown(arg) => format!("{}: not found", arg.trim()),
@@ -99,8 +132,20 @@ impl<'a> Builtin<'a> {
     }
 }
 
-impl<'a> Eval for Builtin<'a> {
-    fn eval(self) -> Result<(), io::Error> {
+impl<'a> Eval<'a> for Builtin<'a> {
+    fn eval(self, stdout: OutputRedir<'a>) -> Result<(), io::Error> {
+        let mut output_stdout;
+        let mut output_file;
+        let stdout: &mut dyn Write = match stdout {
+            Some(path) => {
+                output_file = File::create(path)?;
+                &mut output_file
+            }
+            None => {
+                output_stdout = io::stdout();
+                &mut output_stdout
+            }
+        };
         match self {
             Builtin::Cd(arg) => {
                 let home;
@@ -113,27 +158,34 @@ impl<'a> Eval for Builtin<'a> {
                 });
                 match env::set_current_dir(path) {
                     Ok(()) => (),
-                    Err(_) => writeln!(
-                        io::stdout(),
-                        "cd: {}: No such file or directory",
-                        path.display()
-                    )?,
+                    Err(_) => {
+                        writeln!(stdout, "cd: {}: No such file or directory", path.display())?
+                    }
                 }
             }
-            Builtin::Echo(args) => writeln!(io::stdout(), "{}", args.trim())?,
-            Builtin::Pwd => writeln!(io::stdout(), "{}", env::current_dir()?.display())?,
-            Builtin::Type(arg) => writeln!(io::stdout(), "{}", Builtin::type_(arg))?,
+            Builtin::Echo(args) => writeln!(stdout, "{}", args.trim())?,
+            Builtin::Pwd => writeln!(stdout, "{}", env::current_dir()?.display())?,
+            Builtin::Type(arg) => writeln!(stdout, "{}", Builtin::type_(arg))?,
         }
         Ok(())
     }
 }
 
-impl<'a> Eval for Executable<'a> {
-    fn eval(self) -> Result<(), io::Error> {
+impl<'a> Eval<'a> for Executable<'a> {
+    fn eval(self, stdout: OutputRedir<'a>) -> Result<(), io::Error> {
         let Executable(cmd, args) = self;
+        let output_stdout;
+        let stdout: Stdio = match stdout {
+            Some(path) => Stdio::from(File::create(path)?),
+            None => {
+                output_stdout = io::stdout();
+                Stdio::from(output_stdout)
+            }
+        };
         process::Command::new(cmd.path())
             .arg0(cmd.file_name())
             .args(args.trim().split(' ').filter(|arg| !arg.is_empty()))
+            .stdout(stdout)
             .spawn()?
             .wait()?;
         Ok(())
