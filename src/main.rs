@@ -9,7 +9,7 @@ use std::{
 
 enum Command<'a> {
     Builtin(Builtin<'a>),
-    Executable(DirEntry, &'a str),
+    Executable(Executable<'a>),
     Exit,
     Unknown(&'a str),
 }
@@ -21,6 +21,8 @@ enum Builtin<'a> {
     Type(&'a str),
 }
 
+struct Executable<'a>(DirEntry, &'a str);
+
 fn main() -> Result<(), io::Error> {
     let mut input = String::new();
     loop {
@@ -29,7 +31,7 @@ fn main() -> Result<(), io::Error> {
         match Command::from(input.as_str()) {
             Command::Exit => break,
             Command::Builtin(cmd) => cmd.eval()?,
-            Command::Executable(cmd, args) => {
+            Command::Executable(Executable(cmd, args)) => {
                 process::Command::new(cmd.path())
                     .arg0(cmd.file_name())
                     .args(args.trim().split(' ').filter(|arg| !arg.is_empty()))
@@ -74,7 +76,7 @@ impl<'a> From<&'a str> for Command<'a> {
                         })
                         && is_executable(&cmd.path())
                     {
-                        return Command::Executable(cmd, args);
+                        return Command::Executable(Executable(cmd, args));
                     }
                 }
                 Command::Unknown(input)
@@ -111,7 +113,7 @@ impl<'a> Builtin<'a> {
                 Command::Builtin(_) | Command::Exit => {
                     writeln!(io::stdout(), "{} is a shell builtin", arg.trim())?
                 }
-                Command::Executable(cmd, _) => writeln!(
+                Command::Executable(Executable(cmd, _)) => writeln!(
                     io::stdout(),
                     "{} is {}",
                     cmd.file_name().display(),
