@@ -49,7 +49,6 @@ impl<'a> From<&'a str> for Command<'a> {
             Some("exit") => Command::Builtin(Builtin::Exit),
             Some("echo") => Command::Builtin(Builtin::Echo(args)),
             Some("type") => Command::Builtin(Builtin::Type(args)),
-            _ => Command::Unknown(input),
             Some(cmd) => {
                 let path = env::var_os("PATH").unwrap_or_default();
                 let path = env::split_paths(&path);
