@@ -87,6 +87,18 @@ impl<'a> From<&'a str> for Command<'a> {
 }
 
 impl<'a> Builtin<'a> {
+    #[inline]
+    fn type_<'c>(command: Command<'c>) -> String {
+        match command {
+            Command::Builtin(_) | Command::Exit => {
+                format!("{} is a shell builtin", arg.trim())
+            }
+            Command::Executable(Executable(cmd, _)) => {
+                format!("{} is {}", cmd.file_name().display(), cmd.path().display())
+            }
+            Command::Unknown(_) => format!("{}: not found", arg.trim()),
+        }
+    }
     fn eval(self) -> Result<(), io::Error> {
         match self {
             Builtin::Cd(arg) => {
@@ -109,18 +121,7 @@ impl<'a> Builtin<'a> {
             }
             Builtin::Echo(args) => writeln!(io::stdout(), "{}", args.trim())?,
             Builtin::Pwd => writeln!(io::stdout(), "{}", env::current_dir()?.display())?,
-            Builtin::Type(arg) => match Command::from(arg) {
-                Command::Builtin(_) | Command::Exit => {
-                    writeln!(io::stdout(), "{} is a shell builtin", arg.trim())?
-                }
-                Command::Executable(Executable(cmd, _)) => writeln!(
-                    io::stdout(),
-                    "{} is {}",
-                    cmd.file_name().display(),
-                    cmd.path().display()
-                )?,
-                Command::Unknown(_) => writeln!(io::stdout(), "{}: not found", arg.trim())?,
-            },
+            Builtin::Type(arg) => writeln!(io::stdout(), "{}", Builtin::type_(Command::from(arg)))?,
         }
         Ok(())
     }
