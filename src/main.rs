@@ -14,6 +14,7 @@ enum Command<'a> {
 }
 
 enum Builtin<'a> {
+    Cd(&'a str),
     Echo(&'a str),
     Exit,
     Pwd,
@@ -58,6 +59,7 @@ impl<'a> From<&'a str> for Command<'a> {
             Some("echo") => Command::Builtin(Builtin::Echo(args)),
             Some("type") => Command::Builtin(Builtin::Type(args)),
             Some("pwd") => Command::Builtin(Builtin::Pwd),
+            Some("cd") => Command::Builtin(Builtin::Cd(args)),
             Some(cmd) => {
                 let path = env::var_os("PATH").unwrap_or_default();
                 let path = env::split_paths(&path);
@@ -85,6 +87,10 @@ impl<'a> From<&'a str> for Command<'a> {
 impl<'a> Builtin<'a> {
     fn eval(self) -> Result<(), io::Error> {
         match self {
+            Builtin::Cd(arg) => {
+                let path = Path::new(arg.trim());
+                env::set_current_dir(path)?
+            }
             Builtin::Exit => {}
             Builtin::Echo(args) => writeln!(io::stdout(), "{}", args.trim())?,
             Builtin::Pwd => writeln!(io::stdout(), "{}", env::current_dir()?.display())?,
