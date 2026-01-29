@@ -23,6 +23,10 @@ enum Builtin<'a> {
 
 struct Executable<'a>(DirEntry, &'a str);
 
+trait Eval {
+    fn eval(self) -> Result<(), io::Error>;
+}
+
 fn main() -> Result<(), io::Error> {
     let mut input = String::new();
     loop {
@@ -99,6 +103,9 @@ impl<'a> Builtin<'a> {
             Command::Unknown(_) => format!("{}: not found", arg.trim()),
         }
     }
+}
+
+impl<'a> Eval for Builtin<'a> {
     fn eval(self) -> Result<(), io::Error> {
         match self {
             Builtin::Cd(arg) => {
@@ -124,6 +131,17 @@ impl<'a> Builtin<'a> {
             Builtin::Type(arg) => writeln!(io::stdout(), "{}", Builtin::type_(Command::from(arg)))?,
         }
         Ok(())
+    }
+}
+
+impl<'a> Eval for Executable<'a> {
+    fn eval(self) -> Result<(), io::Error> {
+        let Executable(cmd, args) = self;
+        process::Command::new(cmd.path())
+            .arg0(cmd.file_name())
+            .args(args.trim().split(' ').filter(|arg| !arg.is_empty()))
+            .spawn()?
+            .wait()?;
     }
 }
 
