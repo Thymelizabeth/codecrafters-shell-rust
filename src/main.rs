@@ -59,18 +59,15 @@ fn prompt() -> Result<(), io::Error> {
 
 impl<'a> From<&'a str> for Command<'a> {
     fn from(input: &'a str) -> Self {
-        let (cmd, args) = match input.split_once(" ") {
-            Some((cmd, args)) => (cmd.trim(), args),
-            None => (input, ""),
-        };
-        let (args, stdout) = match args.split_once("1>") {
+        let (cmd, args) = input.split_once(" ").unwrap_or((input, ""));
+        let (args, stdout) = match args.trim().split_once("1>") {
             Some((args, stdout)) => (args, Some(Path::new(stdout))),
             None => match args.split_once(">") {
                 Some((args, stdout)) => (args, Some(Path::new(stdout))),
                 None => (args, None),
             },
         };
-        match cmd {
+        match cmd.trim() {
             "exit" => Command::Exit,
             "echo" => Command::Builtin {
                 command: Builtin::Echo(args),
