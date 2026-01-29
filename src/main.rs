@@ -10,13 +10,13 @@ use std::{
 enum Command<'a> {
     Builtin(Builtin<'a>),
     Executable(DirEntry, &'a str),
+    Exit,
     Unknown(&'a str),
 }
 
 enum Builtin<'a> {
     Cd(&'a str),
     Echo(&'a str),
-    Exit,
     Pwd,
     Type(&'a str),
 }
@@ -27,7 +27,7 @@ fn main() -> Result<(), io::Error> {
         prompt()?;
         io::stdin().read_line(&mut input)?;
         match Command::from(input.as_str()) {
-            Command::Builtin(Builtin::Exit) => break,
+            Command::Exit => break,
             Command::Builtin(cmd) => cmd.eval()?,
             Command::Executable(cmd, args) => {
                 process::Command::new(cmd.path())
@@ -55,7 +55,7 @@ impl<'a> From<&'a str> for Command<'a> {
         let cmd = split_input.next().map(str::trim);
         let args = split_input.next().unwrap_or("");
         match cmd {
-            Some("exit") => Command::Builtin(Builtin::Exit),
+            Some("exit") => Command::Exit,
             Some("echo") => Command::Builtin(Builtin::Echo(args)),
             Some("type") => Command::Builtin(Builtin::Type(args)),
             Some("pwd") => Command::Builtin(Builtin::Pwd),
@@ -105,11 +105,12 @@ impl<'a> Builtin<'a> {
                     )?,
                 }
             }
-            Builtin::Exit => {}
             Builtin::Echo(args) => writeln!(io::stdout(), "{}", args.trim())?,
             Builtin::Pwd => writeln!(io::stdout(), "{}", env::current_dir()?.display())?,
             Builtin::Type(arg) => match Command::from(arg) {
-                Command::Builtin(_) => writeln!(io::stdout(), "{} is a shell builtin", arg.trim())?,
+                Command::Builtin(_) | Command::Exit => {
+                    writeln!(io::stdout(), "{} is a shell builtin", arg.trim())?
+                }
                 Command::Executable(cmd, _) => writeln!(
                     io::stdout(),
                     "{} is {}",
