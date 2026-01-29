@@ -61,9 +61,9 @@ impl<'a> From<&'a str> for Command<'a> {
     fn from(input: &'a str) -> Self {
         let (cmd, args) = input.split_once(" ").unwrap_or((input, ""));
         let (args, stdout) = match args.trim().split_once("1>") {
-            Some((args, stdout)) => (args, Some(Path::new(stdout))),
+            Some((args, stdout)) => (args, Some(Path::new(stdout.trim()))),
             None => match args.split_once(">") {
-                Some((args, stdout)) => (args, Some(Path::new(stdout))),
+                Some((args, stdout)) => (args, Some(Path::new(stdout.trim()))),
                 None => (args, None),
             },
         };
@@ -174,7 +174,6 @@ impl<'a> Eval<'a> for Builtin<'a> {
 impl<'a> Eval<'a> for Executable<'a> {
     fn eval(self, stdout: OutputRedir<'a>) -> Result<(), io::Error> {
         let Executable(cmd, args) = self;
-        let output_stdout;
         let stdout: Stdio = match stdout {
             Some(path) => {
                 if let Some(dir_path) = path.parent() {
@@ -182,17 +181,13 @@ impl<'a> Eval<'a> for Executable<'a> {
                 }
                 Stdio::from(File::create(path)?)
             }
-            None => {
-                output_stdout = io::stdout();
-                Stdio::from(output_stdout)
-            }
+            None => Stdio::inherit(),
         };
         process::Command::new(cmd.path())
             .arg0(cmd.file_name())
             .args(args.trim().split(' ').filter(|arg| !arg.is_empty()))
             .stdout(stdout)
-            .spawn()?
-            .wait()?;
+            .status()?;
         Ok(())
     }
 }
