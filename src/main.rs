@@ -49,13 +49,14 @@ impl<'a> From<&'a str> for Command<'a> {
 
 impl<'a> Builtin<'a> {
     fn eval(self) -> Result<(), io::Error> {
-        Ok(match self {
+        match self {
             Builtin::Exit => {}
             Builtin::Echo(args) => writeln!(io::stdout(), "{}", args.trim())?,
             Builtin::Type(arg) => match Command::from(arg) {
                 Command::Builtin(_) => writeln!(io::stdout(), "{} is a shell builtin", arg.trim())?,
                 Command::Unknown(_) => writeln!(io::stdout(), "{}: not found", arg.trim())?,
             },
-        })
+        }
+        Ok(())
     }
 }
