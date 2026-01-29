@@ -1,7 +1,12 @@
 use std::io::{self, Write};
 
 enum Command<'a> {
+    Builtin(Builtin),
     Unknown(&'a str),
+}
+
+enum Builtin {
+    Exit,
 }
 
 fn main() -> Result<(), io::Error> {
@@ -11,6 +16,7 @@ fn main() -> Result<(), io::Error> {
 
         io::stdin().read_line(&mut input)?;
         match Command::parse_command(&input) {
+            Command::Builtin(Builtin::Exit) => break,
             Command::Unknown(cmd) => println!("{}: command not found", cmd.trim()),
         }
         input.clear();
@@ -27,6 +33,7 @@ fn prompt() -> Result<(), io::Error> {
 impl<'a> Command<'a> {
     fn parse_command(input: &'a str) -> Self {
         match input.trim() {
+            "exit" => Command::Builtin(Builtin::Exit),
             _ => Command::Unknown(input),
         }
     }
