@@ -138,6 +138,7 @@ impl<'a> Eval<'a> for Builtin<'a> {
         let mut output_file;
         let stdout: &mut dyn Write = match stdout {
             Some(path) => {
+                fs::create_dir_all(path)?;
                 output_file = File::create(path)?;
                 &mut output_file
             }
@@ -176,7 +177,10 @@ impl<'a> Eval<'a> for Executable<'a> {
         let Executable(cmd, args) = self;
         let output_stdout;
         let stdout: Stdio = match stdout {
-            Some(path) => Stdio::from(File::create(path)?),
+            Some(path) => {
+                fs::create_dir_all(path)?;
+                Stdio::from(File::create(path)?)
+            }
             None => {
                 output_stdout = io::stdout();
                 Stdio::from(output_stdout)
