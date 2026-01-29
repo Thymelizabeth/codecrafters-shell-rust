@@ -17,7 +17,7 @@ fn main() -> Result<(), io::Error> {
         io::stdin().read_line(&mut input)?;
         match Command::parse_command(&input) {
             Command::Builtin(Builtin::Exit) => break,
-            Command::Unknown(cmd) => println!("{}: command not found", cmd.trim()),
+            Command::Unknown(cmd) => writeln!(io::stdout(), "{}: command not found", cmd.trim())?,
         }
         input.clear();
     }
