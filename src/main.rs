@@ -4,6 +4,7 @@ use std::{
     io::{self, Write},
     os::unix::fs::PermissionsExt,
     path::Path,
+    process,
 };
 
 enum Command<'a> {
@@ -26,7 +27,12 @@ fn main() -> Result<(), io::Error> {
         match Command::from(input.as_str()) {
             Command::Builtin(Builtin::Exit) => break,
             Command::Builtin(cmd) => cmd.eval()?,
-            Command::Executable(_cmd, _args) => todo!(),
+            Command::Executable(cmd, args) => {
+                process::Command::new(cmd.path())
+                    .args(args.trim().split(' ').filter(|arg| !arg.is_empty()))
+                    .spawn()?
+                    .wait()?;
+            }
             Command::Unknown(cmd) => writeln!(io::stdout(), "{}: command not found", cmd.trim())?,
         }
         input.clear();
