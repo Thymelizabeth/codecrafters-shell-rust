@@ -74,10 +74,13 @@ fn prompt() -> Result<(), io::Error> {
 impl<'a> From<&'a str> for Command<'a> {
     fn from(input: &'a str) -> Self {
         let (cmd, args) = input.split_once(" ").unwrap_or((input, ""));
-        let (args, stderr) = match args.trim().split_once("2>") {
-            Some((args, stderr)) => (args, Some((Path::new(stderr.trim()), Overwrite::Overwrite))),
-            None => (args, None),
-        };
+	let (args, stderr) = if let Some((args, stderr)) = args.trim().split_once("2>>") {
+	    (args, Some((Path::new(stderr.trim()), Overwrite::Append)))
+	} else if let Some((args, stderr)) = args.trim().split_once("2>") {
+	    (args, Some((Path::new(stderr.trim()), Overwrite::Overwrite)))
+	} else {
+	    (args, None)
+	};
         let (args, stdout) = if let Some((args, stdout)) = args.trim().split_once("1>>") {
             (args, Some((Path::new(stdout.trim()), Overwrite::Append)))
         } else if let Some((args, stdout)) = args.trim().split_once(">>") {
