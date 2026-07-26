@@ -6,8 +6,12 @@ use std::{
     path::Path,
     process::{self, Stdio},
 };
+enum Overwrite {
+    Overwrite,
+    Append,
+}
 
-type OutputRedir<'a> = Option<&'a Path>;
+type OutputRedir<'a> = Option<(&'a Path, Overwrite)>;
 
 enum Command<'a> {
     Builtin {
@@ -71,15 +75,19 @@ impl<'a> From<&'a str> for Command<'a> {
     fn from(input: &'a str) -> Self {
         let (cmd, args) = input.split_once(" ").unwrap_or((input, ""));
         let (args, stderr) = match args.trim().split_once("2>") {
-            Some((args, stderr)) => (args, Some(Path::new(stderr.trim()))),
+            Some((args, stderr)) => (args, Some((Path::new(stderr.trim()), Overwrite::Overwrite))),
             None => (args, None),
         };
-        let (args, stdout) = match args.trim().split_once("1>") {
-            Some((args, stdout)) => (args, Some(Path::new(stdout.trim()))),
-            None => match args.split_once(">") {
-                Some((args, stdout)) => (args, Some(Path::new(stdout.trim()))),
-                None => (args, None),
-            },
+        let (args, stdout) = if let Some((args, stdout)) = args.trim().split_once("1>>") {
+            (args, Some((Path::new(stdout.trim()), Overwrite::Append)))
+        } else if let Some((args, stdout)) = args.trim().split_once(">>") {
+            (args, Some((Path::new(stdout.trim()), Overwrite::Append)))
+        } else if let Some((args, stdout)) = args.trim().split_once("1>") {
+            (args, Some((Path::new(stdout.trim()), Overwrite::Overwrite)))
+        } else if let Some((args, stdout)) = args.trim().split_once(">") {
+            (args, Some((Path::new(stdout.trim()), Overwrite::Overwrite)))
+        } else {
+            (args, None)
         };
         match cmd.trim() {
             "exit" => Command::Exit,
@@ -157,11 +165,14 @@ impl<'a> Eval<'a> for Builtin<'a> {
         let mut output_file;
         let mut error_file;
         let stdout: &mut dyn Write = match stdout {
-            Some(path) => {
+            Some((path, overwrite)) => {
                 if let Some(dir_path) = path.parent() {
                     fs::create_dir_all(dir_path)?;
                 }
-                output_file = File::create(path)?;
+                output_file = match overwrite {
+                    Overwrite::Overwrite => File::create(path)?,
+                    Overwrite::Append => File::options().append(true).create(true).open(path)?,
+                };
                 &mut output_file
             }
             None => {
@@ -170,11 +181,14 @@ impl<'a> Eval<'a> for Builtin<'a> {
             }
         };
         let stderr: &mut dyn Write = match stderr {
-            Some(path) => {
+            Some((path, overwrite)) => {
                 if let Some(dir_path) = path.parent() {
                     fs::create_dir_all(dir_path)?;
                 }
-                error_file = File::create(path)?;
+                error_file = match overwrite {
+                    Overwrite::Overwrite => File::create(path)?,
+                    Overwrite::Append => File::options().append(true).create(true).open(path)?,
+                };
                 &mut error_file
             }
             None => {
@@ -214,20 +228,26 @@ impl<'a> Eval<'a> for Executable<'a> {
     fn eval(self, stdout: OutputRedir<'a>, stderr: OutputRedir<'a>) -> Result<(), io::Error> {
         let Executable(cmd, args) = self;
         let stdout: Stdio = match stdout {
-            Some(path) => {
+            Some((path, overwrite)) => {
                 if let Some(dir_path) = path.parent() {
                     fs::create_dir_all(dir_path)?;
                 }
-                Stdio::from(File::create(path)?)
+                Stdio::from(match overwrite {
+                    Overwrite::Overwrite => File::create(path)?,
+                    Overwrite::Append => File::options().append(true).create(true).open(path)?,
+                })
             }
             None => Stdio::inherit(),
         };
         let stderr: Stdio = match stderr {
-            Some(path) => {
+            Some((path, overwrite)) => {
                 if let Some(dir_path) = path.parent() {
                     fs::create_dir_all(dir_path)?;
                 }
-                Stdio::from(File::create(path)?)
+                Stdio::from(match overwrite {
+                    Overwrite::Overwrite => File::create(path)?,
+                    Overwrite::Append => File::options().append(true).create(true).open(path)?,
+                })
             }
             None => Stdio::inherit(),
         };
